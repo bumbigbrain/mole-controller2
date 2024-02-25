@@ -3,7 +3,6 @@
 #include <esp_now.h>
 #include <WiFi.h>
 
-// put function declarations here:
 #define SERVO_PIN 13
 #define PUSH_BUTTON 19
 #define LDR_PIN 36
@@ -17,7 +16,6 @@ typedef struct targetMessage {
 Servo myServo;
 targetMessage target_message;
 esp_now_peer_info_t peerInfo;
-
 
 
 
@@ -67,14 +65,12 @@ void setup() {
   //ESPNOW setup RECIEVING
   esp_now_register_recv_cb(OnDataRecv);
 
-  // Register peer
+  // Register stateControllerPeer
   memcpy(peerInfo.peer_addr, stateControllerAddress, 6);
   peerInfo.channel = 0;
   peerInfo.encrypt = false;
 
 
-
-  // เชื่อมต่ออุปกรณ์ที่ต้องการสื่อสาร
   if (esp_now_add_peer(&peerInfo) != ESP_OK) {
     Serial.println("Failed to add peer");
     return;
@@ -85,17 +81,10 @@ void setup() {
 }
 
 void loop() {
-  // put your main code here, to run repeatedly:
-  // myServo.write(0);
-  // delay(1000);
-  // myServo.write(90);
   if (digitalRead(PUSH_BUTTON) == LOW) { // if target is shot
-
     esp_err_t result = esp_now_send(stateControllerAddress, (uint8_t *) &target_message, sizeof(target_message));
     downTarget();
-    delay(500);
-
-  
+    delay(500); 
   } 
   
   // LDR TESTING
@@ -106,6 +95,3 @@ void loop() {
 
   
 }
-
-// put function definitions here:
-// grnd, pin13, 5v
