@@ -7,30 +7,44 @@
 #define PUSH_BUTTON 19
 #define LDR_PIN 36
 
-uint8_t stateControllerAddress[] = {0x3C, 0x61, 0x05, 0x03, 0xD4, 0xB0};
+uint8_t Controller1Address[] = {0x3C, 0x61, 0x05, 0x03, 0xA2, 0x74};
+esp_now_peer_info_t peerInfoController1;
 
-typedef struct targetMessage {
-  int targetState;
-} targetMessage; 
 
+typedef struct MoleMessage {
+  int mole;
+} MoleMessage;
+
+
+
+MoleMessage MoleInfo;
 Servo myServo;
-targetMessage target_message;
-esp_now_peer_info_t peerInfo;
 
 
 
 
-void upTarget() {
-  Serial.printf("UP TARGET : ");
+void UpMole() {
+  Serial.println("UP MOLE");
   myServo.write(90);
-  Serial.println(WiFi.macAddress());
 }
 
-void downTarget() {
-  Serial.printf("DOWN TARGET : ");
+void DownMole() {
+  Serial.println("DOWN MOLE");
   myServo.write(0);
-  Serial.println(WiFi.macAddress());
 }
+
+
+bool Debounce() {
+  if (digitalRead(PUSH_BUTTON) == LOW) {
+    delay(50);
+    if (digitalRead(PUSH_BUTTON) == HIGH) {
+      return true;
+    }
+  } 
+  return false;
+
+}
+
 
 
 void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) {
@@ -39,59 +53,67 @@ void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) {
 }
 
 void OnDataRecv(const uint8_t *mac, const uint8_t *incomingData, int len) {
-  memcpy(&target_message, incomingData, sizeof(target_message));
-  if (target_message.targetState == 0) {
-    downTarget();
-  } else {
-    upTarget();
+  // memcpy(&target_message, incomingData, sizeof(target_message));
+  // if (target_message.targetState == 0) {
+  //   downTarget();
+  // } else {
+  //   upTarget();
+  // }
+  memcpy(&MoleInfo, incomingData, sizeof(MoleInfo));
+  if (MoleInfo.mole == 1) {
+    UpMole();
   }
-
   
 }
 
 
 void setup() {
 
-
-  //Button Setting
+  // setup BUTTON
   pinMode(PUSH_BUTTON, INPUT_PULLUP);
 
-  //ESPNOW setup SENDING
   Serial.begin(9600); 
   WiFi.mode(WIFI_STA);
-  esp_now_init();
+
+  // init ESP-NOW
+  if (esp_now_init() != ESP_OK) {
+    Serial.println("Error initilizing ESP-NOW");
+    return;
+  }
+
+  // Do OnDataSent when send
   esp_now_register_send_cb(OnDataSent);
 
-  //ESPNOW setup RECIEVING
+  // Do OnDataRecv when recieve
   esp_now_register_recv_cb(OnDataRecv);
 
-  // Register stateControllerPeer
-  memcpy(peerInfo.peer_addr, stateControllerAddress, 6);
-  peerInfo.channel = 0;
-  peerInfo.encrypt = false;
-
-
-  if (esp_now_add_peer(&peerInfo) != ESP_OK) {
+  // register peer Controller1
+  memcpy(peerInfoController1.peer_addr, Controller1Address, 6);
+  peerInfoController1.channel = 0;
+  peerInfoController1.encrypt = false;
+  if (esp_now_add_peer(&peerInfoController1) != ESP_OK) {
     Serial.println("Failed to add peer");
     return;
   }
   
-  //Servo 
+  //setup SERVO
   myServo.attach(SERVO_PIN);
+  myServo.write(0);
 }
 
-void loop() {
-  if (digitalRead(PUSH_BUTTON) == LOW) { // if target is shot
-    esp_err_t result = esp_now_send(stateControllerAddress, (uint8_t *) &target_message, sizeof(target_message));
-    downTarget();
-    delay(500); 
-  } 
-  
-  // LDR TESTING
-  // int val = analogRead(LDR_PIN); 
-  // Serial.print("ldr val = ");
-  // Serial.println(val);
-  // delay(500);
 
+
+
+
+void loop() {
+  if (Debounce() && MoleInfo.mole) { // the botton is pressed
+    // if MOLE UP do this 
+    esp_err_t result = esp_now_send(Controller1Address, (uint8_t *) &MoleInfo, sizeof(MoleInfo)); 
+    MoleInfo.mole = 0;
+  }  
   
+  if (MoleInfo.mole == 0) {
+    DownMole();
+  }
+
 }
